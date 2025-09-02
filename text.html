@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neon UI</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0f0b1a;
+      color: #ede7f7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    .avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 3px solid #ff0000; /* merah */
+      margin-bottom: 20px;
+      object-fit: cover;
+    }
+    .card {
+      background: #0b0710;
+      border-radius: 20px;
+      padding: 20px;
+      width: 90%;
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+    .card.red {
+      border: 2px solid #ff0000;
+      box-shadow: 0 0 12px #ff000055;
+    }
+    .card.blue {
+      border: 2px solid #00aaff;
+      box-shadow: 0 0 12px #00aaff55;
+    }
+    .profile {
+      text-align: center;
+    }
+    .profile h2 {
+      margin: 0;
+      font-size: 22px;
+      color: #ff0000;
+    }
+    .profile p {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: #d5cfe8;
+    }
+    label {
+      display: block;
+      margin-top: 12px;
+      color: #00aaff;
+      text-align: center;
+    }
+    input, select {
+      width: 100%;
+      max-width: 280px;   /* biar nggak kepanjangan */
+      padding: 10px;
+      margin-top: 6px;
+      border-radius: 12px;
+      border: 1px solid #555;
+      background: #0b0710;
+      color: #ede7f7;
+      font-size: 14px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto; /* posisi di tengah */
+    }
+    .btn {
+      width: 100%;
+      max-width: 280px;   /* tombol juga sejajar */
+      padding: 14px;
+      margin: 18px auto 0;
+      border: none;
+      border-radius: 20px;
+      background: #ff0000; /* merah */
+      color: #fff;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 0 12px #ff0000aa;
+      display: block;
+    }
+    .btn:hover {
+      opacity: 0.9;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Avatar di tengah -->
+  <img src="avatar.png" alt="Avatar" class="avatar">
+
+  <!-- Kartu Profil (Merah) -->
+  <div class="card red">
+    <div class="profile">
+      <h2>Shadow</h2>
+      <p>Role: RESELLER · Exp: 2053-01-11</p>
+    </div>
+  </div>
+
+  <!-- Form Input (Biru) -->
+  <div class="card blue">
+    <label for="target">Target Number</label>
+    <input type="text" id="target" placeholder="628xxxxxxx">
+
+    <label for="bug">Select Bug</label>
+    <select id="bug">
+      <option>Crash Infinity</option>
+      <option>Spam 100x</option>
+      <option>Freeze Frame</option>
+    </select>
+
+    <button class="btn" onclick="sendBug()">☠ SEND BUG</button>
+  </div>
+
+  <script>
+    function sendBug() {
+      const number = document.getElementById("target").value;
+      const bug = document.getElementById("bug").value;
+      if (!number) {
+        alert("Masukkan target number dulu!");
+        return;
+      }
+      alert(`Simulasi kirim bug: ${bug} → ${number}`);
+    }
+  </script>
+
+</body>
+</html>
