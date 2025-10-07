@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Monster Chase</title>
+<style>
+html,body{height:100%;margin:0;font-family:system-ui,Segoe UI,Roboto,Arial;background:#101418;color:#fff;}
+#wrap{display:flex;flex-direction:column;height:100%}
+header{padding:10px;background:#0b1220;display:flex;align-items:center;gap:10px}
+main{flex:1;display:flex}
+#game{flex:3;display:flex;align-items:center;justify-content:center;position:relative;}
+canvas{background:#071018;border:4px solid #0f1724;border-radius:8px;max-width:100%;height:auto;}
+#side{flex:1;min-width:180px;max-width:220px;padding:10px;background:#1c1f26;box-sizing:border-box;overflow-y:auto;border-left:2px solid #0f1724;}
+label{display:block;margin-top:6px;font-size:13px}
+input,select{width:100%;padding:5px;margin-top:4px;box-sizing:border-box;font-size:13px;}
+.players-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:150px;overflow-y:auto;}
+.player-badge{padding:4px;border-radius:6px;background:#2c2f3a;display:flex;justify-content:space-between;align-items:center;font-size:13px;}
+.small{font-size:12px;color:#aaa}
+.dead{opacity:0.5}
+button{width:100%;padding:6px;margin-top:6px;font-size:14px;font-weight:bold;cursor:pointer;border:none;border-radius:6px;}
+button:disabled{opacity:0.5;cursor:not-allowed;}
+#walkBtn{background:#3498db;color:#fff;}
+#respawnBtn{background:#e67e22;color:#fff;}
+.move-buttons{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin-top:6px;}
+.move-buttons button{width:48%;padding:8px;font-size:16px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+<header>
+<strong>Monster Chase</strong>
+<div style="margin-left:auto" id="levelLabel">Level: 1</div>
+</header>
+<main>
+<div id="game">
+<canvas id="c" width="900" height="560"></canvas>
+</div>
+<aside id="side">
+<label>Nama Pemain</label>
+<input id="name" placeholder="Nama kamu">
+<label>Mode</label>
+<select id="mode"><option value="host">Host</option><option value="join">Join</option></select>
+
+<div id="hostControls">
+<label>IP Local Host (untuk teman join via hotspot)</label>
+<input id="hostIP" placeholder="contoh: 192.168.43.1">
+<button id="startGame">Start Game</button>
+</div>
+
+<div id="joinControls" style="display:none">
+<label>IP Host</label>
+<input id="joinIP" placeholder="Masukkan IP host">
+<button id="connectHost">Join Room</button>
+</div>
+
+<label>Lobby</label>
+<div class="players-list" id="players"></div>
+<div class="small" id="status">Idle</div>
+
+<button id="walkBtn">Jalan: Off</button>
+<button id="respawnBtn">Respawn</button>
+
+<div class="move-buttons">
+<button>↑</button>
+<button>↓</button>
+<button>←</button>
+<button>→</button>
+</div>
+</aside>
+</main>
+</div>
+
+<script>
+const canvas=document.getElementById('c');
+const ctx=canvas.getContext('2d');
+const world={w:canvas.width,h:canvas.height};
+const nameInput=document.getElementById('name');
+const modeSelect=document.getElementById('mode');
+const hostControls=document.getElementById('hostControls');
+const joinControls=document.getElementById('joinControls');
+const playersDiv=document.getElementById('players');
+const statusDiv=document.getElementById('status');
+const startBtn=document.getElementById('startGame');
+const walkBtn=document.getElementById('walkBtn');
+const respawnBtn=document.getElementById('respawnBtn');
+
+let isHost=false;
+let localPlayerId=null;
+let players={};
+let monster={x:450,y:280,v:1};
+let currentLevel=1;
+let MAX_LEVEL=10;
+let levelData=null;
+let gameStarted=false;
+let walkEnabled=false;
+
+// LEVEL GENERATOR
+function generateLevel(level){
+    const walls=[];
+    walls.push({x:0,y:0,w:world.w,h:10});
+    walls.push({x:0,y:world.h-10,w:world.w,h:10});
+    walls.push({x:0,y:0,w:10,h:world.h});
+    walls.push({x:world.w-10,y:0,w:10,h:world.h});
+    const portal={x:world.w-60,y:60,r:18};
+    return {walls,portal};
+}
+levelData=generateLevel(currentLevel);
+
+// SPAWN
+function findSafeSpawn(){
+    return {x:50+Math.random()*(world.w-100), y:50+Math.random()*(world.h-100)};
+}
+
+// DRAW
+function draw(){
+    ctx.clearRect(0,0,world.w,world.h);
+    ctx.fillStyle='#2c3e50'; for(const w of levelData.walls) ctx.fillRect(w.x,w.y,w.w,w.h);
+    ctx.beginPath(); ctx.strokeStyle='#9b59b6'; ctx.lineWidth=4; ctx.arc(levelData.portal.x,levelData.portal.y,levelData.portal.r,0,Math.PI*2); ctx.stroke();
+    ctx.fillStyle='#c0392b'; ctx.beginPath(); ctx.arc(monster.x,monster.y,18,0,Math.PI*2); ctx.fill();
+    for(const id in players){
+        const p=players[id];
+        ctx.fillStyle=p.dead?'#666':p.color;
+        ctx.beginPath(); ctx.arc(p.x,p.y,10,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='white';
+        ctx.fillText(p.name+(p.dead?' (DEAD)':''),p.x+12,p.y+4);
+    }
+}
+
+// UPDATE PLAYER LIST
+function updatePlayersList(){
+    playersDiv.innerHTML='';
+    for(const id in players){
+        const p=players[id];
+        const div=document.createElement('div');
+        div.className='player-badge'+(p.dead?' dead':'');
+        div.textContent=p.name+(p.dead?' (DEAD)':'');
+        playersDiv.appendChild(div);
+    }
+}
+
+// STEP GAME
+function step(){
+    if(!gameStarted) return;
+    let nearest=null,nd=1e9;
+    for(const id in players){
+        const p=players[id];
+        if(!p.dead){
+            const d=Math.hypot(p.x-monster.x,p.y-monster.y);
+            if(d<nd){nd=d;nearest=p;}
+        }
+    }
+    if(nearest){
+        const dx=nearest.x-monster.x;
+        const dy=nearest.y-monster.y;
+        const ang=Math.atan2(dy,dx);
+        monster.x+=Math.cos(ang)*monster.v;
+        monster.y+=Math.sin(ang)*monster.v;
+    }
+    for(const id in players){
+        const p=players[id];
+        if(!p.dead && Math.hypot(p.x-monster.x,p.y-monster.y)<28){
+            p.dead=true;
+            if(id===localPlayerId) statusDiv.textContent='Kamu tertangkap — MATI';
+        }
+    }
+    for(const id in players){
+        const p=players[id];
+        if(!p.dead && Math.hypot(p.x-levelData.portal.x,p.y-levelData.portal.y)<levelData.portal.r+8){
+            advanceLevel();
+        }
+    }
+}
+
+// ADVANCE LEVEL
+function advanceLevel(){
+    currentLevel++;
+    if(currentLevel>MAX_LEVEL) currentLevel=1;
+    levelData=generateLevel(currentLevel);
+    for(const id in players){
+        const p=players[id];
+        const s=findSafeSpawn();
+        p.x=s.x; p.y=s.y; p.dead=false;
+    }
+    document.getElementById('levelLabel').textContent='Level: '+currentLevel;
+    updatePlayersList();
+}
+
+// GAME LOOP
+function gameLoop(){
+    step();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+requestAnimationFrame(gameLoop);
+
+// INPUT
+walkBtn.addEventListener('click',()=>{
+    walkEnabled=!walkEnabled;
+    walkBtn.textContent='Jalan: '+(walkEnabled?'On':'Off');
+});
+respawnBtn.addEventListener('click',()=>{
+    if(players[localPlayerId]){
+        const s=findSafeSpawn();
+        players[localPlayerId].x=s.x;
+        players[localPlayerId].y=s.y;
+        players[localPlayerId].dead=false;
+        updatePlayersList();
+        statusDiv.textContent='Respawned';
+    }
+});
+
+// PLAYER MOVE
+function movePlayer(dir){
+    if(!walkEnabled) return;
+    const p = players[localPlayerId];
+    if(!p || p.dead) return;
+    const speed = 4;
+    switch(dir){
+        case 'up': p.y -= speed; break;
+        case 'down': p.y += speed; break;
+        case 'left': p.x -= speed; break;
+        case 'right': p.x += speed; break;
+    }
+}
+
+// HOLD MOVE
+let moveInterval=null;
+document.querySelectorAll('.move-buttons button').forEach(btn=>{
+    const dir = btn.textContent==='↑'?'up':btn.textContent==='↓'?'down':btn.textContent==='←'?'left':'right';
+    btn.addEventListener('mousedown',()=>{if(walkEnabled){moveInterval=setInterval(()=>movePlayer(dir),50);}});
+    btn.addEventListener('touchstart',()=>{if(walkEnabled){moveInterval=setInterval(()=>movePlayer(dir),50);}});
+    btn.addEventListener('mouseup',()=>{clearInterval(moveInterval); moveInterval=null;});
+    btn.addEventListener('mouseleave',()=>{clearInterval(moveInterval); moveInterval=null;});
+    btn.addEventListener('touchend',()=>{clearInterval(moveInterval); moveInterval=null;});
+});
+
+// KEYBOARD MOVE
+document.addEventListener('keydown', (e)=>{
+    if(!walkEnabled) return;
+    const p = players[localPlayerId];
+    if(!p || p.dead) return;
+    switch(e.key){
+        case 'ArrowUp': case 'w': p.y-=4; break;
+        case 'ArrowDown': case 's': p.y+=4; break;
+        case 'ArrowLeft': case 'a': p.x-=4; break;
+        case 'ArrowRight': case 'd': p.x+=4; break;
+    }
+});
+
+// LOBBY MODE
+modeSelect.addEventListener('change',()=>{
+    isHost=(modeSelect.value==='host');
+    hostControls.style.display=isHost?'block':'none';
+    joinControls.style.display=isHost?'none':'block';
+});
+
+// START GAME
+startBtn.addEventListener('click',()=>{
+    if(Object.keys(players).length>=1){
+        gameStarted=true;
+        statusDiv.textContent='Game Dimulai!';
+    }
+});
+
+// ADD LOCAL PLAYER
+function addLocalPlayer(name){
+    const id = Object.keys(players).length;
+    players[id] = {
+        x: 50 + Math.random() * (world.w - 100),
+        y: 50 + Math.random() * (world.h - 100),
+        color: '#'+Math.floor(Math.random()*0xffffff).toString(16),
+        name: name || 'P',
+        dead: false
+    };
+    if(localPlayerId===null) localPlayerId = id;
+    updatePlayersList();
+    startBtn.disabled = false;
+    statusDiv.textContent = 'Siap main!';
+}
+
+// SPAWN PLAYER SENDIRIAN
+addLocalPlayer('P');
+</script>
+</body>
+</html>
